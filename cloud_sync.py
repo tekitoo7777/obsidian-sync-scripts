@@ -87,6 +87,25 @@ class CloudSync:
         
         return "\n".join(formatted_tasks)
     
+    def create_simple_daily_note_content(self, tasks):
+        """GitHub Actions用シンプルな日次ノートのコンテンツを作成"""
+        today = datetime.now()
+        date_str = today.strftime("%Y-%m-%d")
+        formatted_tasks = self.format_tasks_for_obsidian(tasks)
+        
+        content = f"""# {date_str}
+
+## 今日のタスク
+
+{formatted_tasks}
+
+## メモ
+
+---
+*Last updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} (GitHub Actions)*
+"""
+        return content
+
     def create_daily_note_content(self, tasks):
         """日次ノートのコンテンツを作成"""
         today = datetime.now()
@@ -233,29 +252,26 @@ tags:
     
     def run_sync(self):
         """同期を実行"""
-        print("🚀 Obsidian-Todoist同期を開始...")
+        print("🚀 クラウド同期を開始...")
         
         # タスクを取得
         tasks = self.get_todoist_tasks()
         
-        # 日次ノートを作成
-        content = self.create_daily_note_content(tasks)
+        # 日次ノートを作成（GitHub Actions用シンプル形式）
+        content = self.create_simple_daily_note_content(tasks)
         
-        # Obsidianファイルに保存
-        obsidian_success = self.save_to_obsidian(content)
-        
-        # GitHubにもバックアップ保存
+        # GitHubに保存
         github_success = self.save_to_github(content)
         
-        if obsidian_success:
-            print("✅ Obsidian同期完了")
+        if github_success:
+            print("✅ 同期完了")
         else:
-            print("❌ Obsidian同期失敗")
+            print("❌ 同期失敗")
         
         # 同期データを保存
         self.save_sync_data(tasks)
         
-        return obsidian_success
+        return github_success
 
 def main():
     """メイン関数"""
