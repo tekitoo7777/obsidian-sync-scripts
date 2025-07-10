@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import base64
 from github import Github
+from config import Config
 
 class CloudSync:
     def __init__(self):
@@ -89,27 +90,81 @@ class CloudSync:
     def create_daily_note_content(self, tasks):
         """日次ノートのコンテンツを作成"""
         today = datetime.now()
-        date_str = today.strftime("%Y-%m-%d")
         formatted_tasks = self.format_tasks_for_obsidian(tasks)
         
-        content = f"""# {date_str}
+        # Obsidianファイルの既存内容を取得
+        obsidian_file_path = Config.get_daily_file_path(today)
+        existing_content = ""
+        
+        try:
+            if os.path.exists(obsidian_file_path):
+                with open(obsidian_file_path, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+        except Exception as e:
+            print(f"⚠️ 既存ファイル読み込みエラー: {e}")
+        
+        # タスクセクションを更新
+        if existing_content:
+            # 既存のタスクセクションを置換
+            import re
+            task_section_pattern = r'(#### ＜今日のタスク＞\s*\n)(.*?)(\n#### ＜AI振り返り＞|$)'
+            new_task_section = f"#### ＜今日のタスク＞\n{formatted_tasks}\n\n"
+            
+            if re.search(task_section_pattern, existing_content, re.DOTALL):
+                updated_content = re.sub(
+                    task_section_pattern,
+                    lambda m: new_task_section + (m.group(3) if m.group(3) else ''),
+                    existing_content,
+                    flags=re.DOTALL
+                )
+            else:
+                # タスクセクションが見つからない場合は末尾に追加
+                updated_content = existing_content + f"\n\n{new_task_section}"
+            
+            return updated_content
+        else:
+            # ファイルが存在しない場合はシンプルな形式で作成
+            date_str = today.strftime("%Y-%m-%d")
+            content = f"""---
+tags:
+  - daily
+  - diary
+---
+### {date_str}
 
-## 今日のタスク
-
+#### ＜今日のタスク＞
 {formatted_tasks}
 
-## メモ
-
 ---
-*Last updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} (GitHub Actions)*
+*Last updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} (Todoist Sync)*
 """
-        return content
+            return content
+    
+    def save_to_obsidian(self, content):
+        """Obsidianファイルに直接保存"""
+        try:
+            today = datetime.now()
+            obsidian_file_path = Config.get_daily_file_path(today)
+            
+            # ディレクトリが存在しない場合は作成
+            os.makedirs(os.path.dirname(obsidian_file_path), exist_ok=True)
+            
+            # ファイルに書き込み
+            with open(obsidian_file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            print(f"✅ Obsidianファイル更新: {obsidian_file_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Obsidianファイル保存エラー: {e}")
+            return False
     
     def save_to_github(self, content):
-        """GitHubリポジトリに保存"""
+        """GitHubリポジトリにもバックアップ保存"""
         if not self.repo:
-            print("❌ GitHub repository not configured")
-            return False
+            print("⚠️ GitHub repository not configured - skipping backup")
+            return True  # Obsidianへの保存が成功していればOK
         
         try:
             today = datetime.now()
@@ -125,7 +180,7 @@ class CloudSync:
                     content,
                     file.sha
                 )
-                print(f"✅ Updated: {file_path}")
+                print(f"✅ GitHub backup updated: {file_path}")
             except:
                 # ファイルが存在しない場合は新規作成
                 self.repo.create_file(
@@ -133,13 +188,13 @@ class CloudSync:
                     f"Create daily note for {today.strftime('%Y-%m-%d')}",
                     content
                 )
-                print(f"✅ Created: {file_path}")
+                print(f"✅ GitHub backup created: {file_path}")
             
             return True
             
         except Exception as e:
-            print(f"❌ GitHub保存エラー: {e}")
-            return False
+            print(f"⚠️ GitHubバックアップエラー: {e}")
+            return True  # バックアップの失敗は致命的ではない
     
     def save_sync_data(self, tasks):
         """同期データをJSONファイルに保存"""
@@ -178,7 +233,7 @@ class CloudSync:
     
     def run_sync(self):
         """同期を実行"""
-        print("🚀 クラウド同期を開始...")
+        print("🚀 Obsidian-Todoist同期を開始...")
         
         # タスクを取得
         tasks = self.get_todoist_tasks()
@@ -186,16 +241,21 @@ class CloudSync:
         # 日次ノートを作成
         content = self.create_daily_note_content(tasks)
         
-        # GitHubに保存
-        if self.save_to_github(content):
-            print("✅ 同期完了")
+        # Obsidianファイルに保存
+        obsidian_success = self.save_to_obsidian(content)
+        
+        # GitHubにもバックアップ保存
+        github_success = self.save_to_github(content)
+        
+        if obsidian_success:
+            print("✅ Obsidian同期完了")
         else:
-            print("❌ 同期失敗")
+            print("❌ Obsidian同期失敗")
         
         # 同期データを保存
         self.save_sync_data(tasks)
         
-        return True
+        return obsidian_success
 
 def main():
     """メイン関数"""
