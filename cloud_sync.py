@@ -36,11 +36,11 @@ class CloudSync:
             self.repo = None
     
     def get_todoist_tasks(self):
-        """Todoistからタスクを取得"""
+        """Todoistからタスクを取得（未完了と今日完了したタスク）"""
         try:
             print("🔍 Todoistタスクを取得中...")
             
-            # 今日期限のタスク
+            # 未完了の今日期限タスク
             today_response = requests.get(
                 "https://api.todoist.com/rest/v2/tasks",
                 headers=self.headers,
@@ -49,26 +49,42 @@ class CloudSync:
             
             if today_response.status_code != 200:
                 print(f"❌ Todoist API error: {today_response.status_code}")
-                return []
+                return [], []
             
-            tasks = today_response.json()
-            print(f"📋 取得したタスク: {len(tasks)}個")
+            incomplete_tasks = today_response.json()
             
-            return tasks
+            # 今日完了したタスク
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            completed_response = requests.get(
+                "https://api.todoist.com/sync/v9/completed/get_all",
+                headers=self.headers,
+                params={
+                    "since": f"{today_str}T00:00",
+                    "until": f"{today_str}T23:59",
+                    "limit": 100
+                }
+            )
+            
+            completed_tasks = []
+            if completed_response.status_code == 200:
+                completed_data = completed_response.json()
+                completed_tasks = completed_data.get('items', [])
+            
+            print(f"📋 取得したタスク: 未完了{len(incomplete_tasks)}個, 完了{len(completed_tasks)}個")
+            
+            return incomplete_tasks, completed_tasks
             
         except Exception as e:
             print(f"❌ タスク取得エラー: {e}")
-            return []
+            return [], []
     
-    def format_tasks_for_obsidian(self, tasks):
-        """タスクをObsidian形式に変換"""
-        if not tasks:
-            return "タスクがありません"
-        
+    def format_tasks_for_obsidian(self, incomplete_tasks, completed_tasks):
+        """タスクをObsidian形式に変換（未完了と完了済み）"""
         formatted_tasks = []
         today = datetime.now().strftime("%Y-%m-%d")
         
-        for task in tasks:
+        # 未完了タスクを処理
+        for task in incomplete_tasks:
             task_line = f"- [ ] {task['content']}"
             
             # 期限があれば追加
@@ -85,13 +101,39 @@ class CloudSync:
             
             formatted_tasks.append(task_line)
         
+        # 完了済みタスクを処理
+        for item in completed_tasks:
+            task = item.get('content', '')
+            if task:
+                task_line = f"- [x] {task}"
+                
+                # 完了時刻を追加
+                completed_at = item.get('completed_at', '')
+                if completed_at:
+                    # ISO形式から時刻のみ抽出
+                    try:
+                        from datetime import datetime
+                        completed_time = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                        task_line += f" ✅ {completed_time.strftime('%H:%M')}"
+                    except:
+                        task_line += " ✅"
+                
+                # プロジェクトがあれば追加
+                if item.get('project_id'):
+                    task_line += f" [プロジェクト: {item['project_id']}]"
+                
+                formatted_tasks.append(task_line)
+        
+        if not formatted_tasks:
+            return "タスクがありません"
+        
         return "\n".join(formatted_tasks)
     
-    def create_simple_daily_note_content(self, tasks):
+    def create_simple_daily_note_content(self, incomplete_tasks, completed_tasks):
         """GitHub Actions用シンプルな日次ノートのコンテンツを作成"""
         today = datetime.now()
         date_str = today.strftime("%Y-%m-%d")
-        formatted_tasks = self.format_tasks_for_obsidian(tasks)
+        formatted_tasks = self.format_tasks_for_obsidian(incomplete_tasks, completed_tasks)
         
         content = f"""# {date_str}
 
@@ -255,10 +297,10 @@ tags:
         print("🚀 クラウド同期を開始...")
         
         # タスクを取得
-        tasks = self.get_todoist_tasks()
+        incomplete_tasks, completed_tasks = self.get_todoist_tasks()
         
         # 日次ノートを作成（GitHub Actions用シンプル形式）
-        content = self.create_simple_daily_note_content(tasks)
+        content = self.create_simple_daily_note_content(incomplete_tasks, completed_tasks)
         
         # GitHubに保存
         github_success = self.save_to_github(content)
@@ -269,7 +311,8 @@ tags:
             print("❌ 同期失敗")
         
         # 同期データを保存
-        self.save_sync_data(tasks)
+        total_tasks = incomplete_tasks + completed_tasks
+        self.save_sync_data(total_tasks)
         
         return github_success
 

@@ -156,7 +156,7 @@ tags:
             return False
     
     def extract_tasks_from_github_content(self, content):
-        """GitHubの内容からタスクリストを抽出"""
+        """GitHubの内容からタスクリストを抽出（未完了と完了済み両方）"""
         try:
             # "## 今日のタスク" セクションからタスクを抽出
             task_section_pattern = r'## 今日のタスク\s*\n(.*?)(?=\n## |$)'
@@ -164,7 +164,20 @@ tags:
             
             if match:
                 tasks_text = match.group(1).strip()
-                return tasks_text
+                
+                # タスクを未完了と完了済みに分離（順序を保持）
+                lines = tasks_text.split('\n')
+                processed_lines = []
+                
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('- [ ]') or line.startswith('- [x]'):
+                        processed_lines.append(line)
+                    elif line:  # 空行でない場合は継続行として処理
+                        if processed_lines:
+                            processed_lines[-1] += ' ' + line
+                
+                return '\n'.join(processed_lines)
             else:
                 print("⚠️ タスクセクションが見つかりませんでした")
                 return ""
