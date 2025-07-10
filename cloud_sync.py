@@ -112,7 +112,6 @@ class CloudSync:
                 if completed_at:
                     # ISO形式から時刻のみ抽出
                     try:
-                        from datetime import datetime
                         completed_time = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
                         task_line += f" ✅ {completed_time.strftime('%H:%M')}"
                     except:
