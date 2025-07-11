@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 # 設定
-OBSIDIAN_VAULT_PATH = "/Users/tekitoo/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault(Icloud) 2"
+OBSIDIAN_VAULT_PATH = "/Users/tekitoo/Library/Mobile Documents/iCloud~md~obsidian/Documents/ObsidianVault"
 DAILY_NOTES_PATH = f"{OBSIDIAN_VAULT_PATH}/Vault/02.Index"
 SYNC_DATA_FILE = f"{OBSIDIAN_VAULT_PATH}/scripts/sync_data.json"
 
