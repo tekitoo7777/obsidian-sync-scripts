@@ -2,6 +2,7 @@
 .DS_Store
 .AppleDouble
 .LSOverride
+Thumbs.db
 
 # Icon must end with two \r
 Icon
@@ -58,6 +59,9 @@ venv.bak/
 
 # Log files
 *.log
+logs/
+cron_sync.log
+calendar_sync.log
 
 # Local environment files
 .env
@@ -81,6 +85,10 @@ venv.bak/
 
 # Node modules
 node_modules/
+
+# Local config
+config_local.py
+sync_data.json
 
 # Personal files
 ../../../../*

@@ -1,0 +1,43 @@
+name: Obsidian Todoist Sync
+
+on:
+  schedule:
+    # 毎日 7時、12時、19時（UTC）に実行
+    - cron: '0 22 * * *'  # 日本時間7時（UTC 22時）
+    - cron: '0 3 * * *'   # 日本時間12時（UTC 3時）
+    - cron: '0 10 * * *'  # 日本時間19時（UTC 10時）
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run sync script
+      env:
+        TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python cloud_sync.py
+        
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update Obsidian sync data - $(date)" && git push)
