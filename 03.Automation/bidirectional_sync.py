@@ -158,21 +158,59 @@ class SyncManager:
         return completed_count
 
     def sync_todoist_to_obsidian(self):
-        """TodoistからObsidianへの同期（既存機能）"""
+        """TodoistからObsidianへの同期"""
         print("🔄 Syncing Todoist → Obsidian...")
         
-        # 既存のdaily_tasks_sync.pyの機能を呼び出し
-        import subprocess
-        result = subprocess.run([
-            './venv/bin/python', 
-            'daily_tasks_sync.py'
-        ], capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            print("✅ Todoist → Obsidian sync completed")
+        try:
+            # 今日のタスクを取得
+            todoist_tasks = self.todoist.get_tasks("today")
+            if not todoist_tasks:
+                print("📝 No tasks found for today")
+                return True
+            
+            # 今日のファイルパスを取得
+            daily_file = self.get_daily_file_path()
+            
+            # ディレクトリが存在しない場合は作成
+            os.makedirs(os.path.dirname(daily_file), exist_ok=True)
+            
+            # ファイルが存在しない場合は作成
+            if not os.path.exists(daily_file):
+                with open(daily_file, 'w', encoding='utf-8') as f:
+                    f.write(f"# {datetime.now().strftime('%Y-%m-%d')}\n\n## 今日のタスク\n\n")
+            
+            # ファイルを読み込み
+            with open(daily_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # タスクセクションを更新
+            task_lines = []
+            for task in todoist_tasks:
+                task_lines.append(f"- [ ] {task['content']} 🔥 [プロジェクト: {task.get('project_id', 'Unknown')}]")
+            
+            # タスクセクションを置換
+            import re
+            pattern = r'(#### ＜今日のタスク＞\n)(.*?)(?=\n#### |$)'
+            if re.search(pattern, content, re.DOTALL):
+                new_content = re.sub(
+                    pattern, 
+                    r'\1\n' + '\n'.join(task_lines) + '\n',
+                    content, 
+                    flags=re.DOTALL
+                )
+            else:
+                # タスクセクションが見つからない場合は追加
+                new_content = content + f"\n#### ＜今日のタスク＞\n\n" + '\n'.join(task_lines) + '\n'
+            
+            # ファイルに書き込み
+            with open(daily_file, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+            print(f"✅ Todoist → Obsidian sync completed: {len(todoist_tasks)} tasks")
             return True
-        else:
-            print(f"❌ Todoist → Obsidian sync failed: {result.stderr}")
+            
+        except Exception as e:
+            print(f"❌ Todoist → Obsidian sync failed: {e}")
             return False
 
     def full_sync(self):
