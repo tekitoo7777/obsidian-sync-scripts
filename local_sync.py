@@ -65,13 +65,13 @@ class LocalSync:
             # Obsidianファイルのタスクセクションを更新
             if existing_content:
                 # 既存のタスクセクションを置換
-                task_section_pattern = r'(#### ＜今日のタスク＞\s*\n)(.*?)(\n#### ＜AI振り返り＞|$)'
-                new_task_section = f"#### ＜今日のタスク＞\n{github_tasks}\n\n"
+                task_section_pattern = r'(#### ＜今日のタスク＞\s*\n)(.*?)(\n#### ＜AI振り返り＞)'
+                new_task_section = f"#### ＜今日のタスク＞\n{github_tasks}\n"
                 
                 if re.search(task_section_pattern, existing_content, re.DOTALL):
                     updated_content = re.sub(
                         task_section_pattern,
-                        lambda m: new_task_section + (m.group(3) if m.group(3) else ''),
+                        lambda m: m.group(1) + github_tasks + '\n' + m.group(3),
                         existing_content,
                         flags=re.DOTALL
                     )

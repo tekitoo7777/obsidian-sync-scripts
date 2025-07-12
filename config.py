@@ -11,7 +11,7 @@ class Config:
     """同期システムの設定クラス"""
     
     # パス設定
-    OBSIDIAN_VAULT_PATH = "/Users/tekitoo/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault(Icloud) 2"
+    OBSIDIAN_VAULT_PATH = "/Users/tekitoo/Library/Mobile Documents/iCloud~md~obsidian/Documents/ObsidianVault"
     DAILY_NOTES_PATH = f"{OBSIDIAN_VAULT_PATH}/Vault/02.Index"
     SCRIPTS_PATH = f"{OBSIDIAN_VAULT_PATH}/scripts"
     SYNC_DATA_FILE = f"{SCRIPTS_PATH}/sync_data.json"
